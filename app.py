@@ -15,6 +15,7 @@ from pdf2image import convert_from_path
 import pytesseract
 import json
 import re
+from werkzeug.utils import secure_filename
 
 # === CONFIG ===
 pytesseract.pytesseract.tesseract_cmd = r"C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
@@ -85,8 +86,11 @@ def summarize_text(text):
 
 # === AUDIO ===
 def generate_audio_summary(text):
-    tts = gTTS(text)
-    tts.save(SUMMARY_AUDIO)
+    try:
+        tts = gTTS(text)
+        tts.save(SUMMARY_AUDIO)
+    except Exception as e:
+        print("❌ TTS Error:", e)
 
 # === QUIZ GENERATION ===
 def generate_quiz_questions(text):
@@ -113,7 +117,6 @@ Content:
             quiz_json = json_match.group(0)
             quiz = json.loads(quiz_json)
 
-            # 🔍 FIX: If answer is index ("0") or label ("A"), convert to actual option
             for q in quiz:
                 answer = q["answer"]
                 if isinstance(answer, str) and answer.strip().isdigit():
@@ -167,7 +170,11 @@ def index():
     summary = questions = ""
     if request.method == "POST":
         file = request.files['pdf']
-        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+        if not file or file.filename == "":
+            return "❌ No PDF uploaded!"
+
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(UPLOAD_FOLDER, filename)
         file.save(file_path)
         session['user'] = request.remote_addr
 
@@ -176,7 +183,7 @@ def index():
             print("Trying OCR fallback...")
             text = extract_text_with_ocr(file_path)
             if not text.strip():
-                return "❌ No readable text found even after OCR. Try uploading a clean PDF."
+                return "❌ No readable text found even after OCR."
 
         print("Text Extracted:", text[:500])
         summary = summarize_text(text)
@@ -215,10 +222,9 @@ def download_history():
 
     return send_file(filepath, as_attachment=True)
 
-
 if __name__ == '__main__':
     app.run(
         host='0.0.0.0',
         port=int(os.environ.get("PORT", 5000)),
-        debug=False  # turn OFF for production
+        debug=False
     )
