@@ -2,6 +2,7 @@ services:
   - type: web
     name: smartdoc-scholar
     env: python
+
     buildCommand: |
       pip install -r requirements.txt
       python download_model.py
