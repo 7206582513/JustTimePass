@@ -1,0 +1,66 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+.idea/
+*.env
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Unit test / coverage
+.coverage
+.tox/
+.nox/
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# VSCode
+.vscode/
+
+# PDF output / temp uploads
+uploads/
+static/summary.mp3
+
+# SQLite database
+history.db
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# PyInstaller
+*.spec
+
+# PDF cache/image temp (from pdf2image)
+__pdfcache__/
+*.ppm
+
+# Notebook metadata
+*.ipynb_metadata
+
+# System files
+*.bak
