@@ -87,10 +87,16 @@ def summarize_text(text):
 # === AUDIO ===
 def generate_audio_summary(text):
     try:
+        from gtts import gTTS
         tts = gTTS(text)
         tts.save(SUMMARY_AUDIO)
     except Exception as e:
-        print("❌ TTS Error:", e)
+        print("⚠️ gTTS failed. Using offline pyttsx3 fallback. Error:", e)
+        engine = pyttsx3.init()
+        engine.setProperty('rate', 150)
+        engine.save_to_file(text, SUMMARY_AUDIO)
+        engine.runAndWait()
+
 
 # === QUIZ GENERATION ===
 def generate_quiz_questions(text):
