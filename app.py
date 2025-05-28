@@ -1,5 +1,3 @@
-# app.py – SmartDoc Scholar Full Web App with OCR Fallback
-
 from flask import Flask, request, render_template, send_file, jsonify, session
 import os
 import fitz  # PyMuPDF
@@ -15,7 +13,6 @@ from pdf2image import convert_from_path
 import pytesseract
 import json
 import re
-from werkzeug.utils import secure_filename
 
 # === CONFIG ===
 pytesseract.pytesseract.tesseract_cmd = r"C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
@@ -40,7 +37,7 @@ def init_db():
 init_db()
 
 # === GROQ API ===
-GROQ_API_KEY = "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"
+GROQ_API_KEY = "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"
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = "llama3-8b-8192"
 
@@ -79,24 +76,23 @@ def extract_text_with_ocr(pdf_path):
         print("OCR Extraction Error:", e)
         return ""
 
-# === NLP BULLET SUMMARY ===
+# === NLP BULLET SUMMARY (simplified for dyslexia) ===
 def summarize_text(text):
-    prompt = f"Summarize this educational note into 5-7 key bullet points:\n\n{text[:3000]}"
+    prompt = (
+        "Summarize the following educational content in 5-7 short, simple bullet points, "
+        "using very clear language suitable for dyslexic learners:\n\n" + text[:3000]
+    )
     return groq_chat(prompt)
 
-# === AUDIO ===
+# === AUDIO GENERATION (with fallback) ===
 def generate_audio_summary(text):
     try:
-        from gtts import gTTS
         tts = gTTS(text)
         tts.save(SUMMARY_AUDIO)
     except Exception as e:
-        print("⚠️ gTTS failed. Using offline pyttsx3 fallback. Error:", e)
-        engine = pyttsx3.init()
-        engine.setProperty('rate', 150)
-        engine.save_to_file(text, SUMMARY_AUDIO)
-        engine.runAndWait()
-
+        print("❌ gTTS Error:", e)
+        with open(SUMMARY_AUDIO, "w") as f:
+            f.write("Audio generation failed.")
 
 # === QUIZ GENERATION ===
 def generate_quiz_questions(text):
@@ -109,7 +105,7 @@ Each question should have:
 - 'options': a list of 4 full answer strings (not labeled A/B/C)
 - 'answer': the full correct answer string (must match one of the options exactly)
 
-Output should be a JSON array only. No markdown, labels, or explanations.
+Output only a JSON array. No explanations.
 
 Content:
 {text[:2500]}
@@ -144,7 +140,7 @@ def build_vector_store(text):
     splitter = CharacterTextSplitter(chunk_size=512, chunk_overlap=100)
     docs = splitter.create_documents([text])
     if not docs:
-        raise ValueError("❌ Unable to generate document chunks from text.")
+        raise ValueError("❌ No document chunks found.")
     embeddings = HuggingFaceEmbeddings()
     return FAISS.from_documents(docs, embeddings)
 
@@ -176,11 +172,7 @@ def index():
     summary = questions = ""
     if request.method == "POST":
         file = request.files['pdf']
-        if not file or file.filename == "":
-            return "❌ No PDF uploaded!"
-
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(UPLOAD_FOLDER, filename)
+        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
         file.save(file_path)
         session['user'] = request.remote_addr
 
@@ -189,9 +181,8 @@ def index():
             print("Trying OCR fallback...")
             text = extract_text_with_ocr(file_path)
             if not text.strip():
-                return "❌ No readable text found even after OCR."
+                return "❌ No readable text found even after OCR. Try uploading a clean PDF."
 
-        print("Text Extracted:", text[:500])
         summary = summarize_text(text)
         generate_audio_summary(summary)
         questions = generate_quiz_questions(text)
@@ -229,8 +220,4 @@ def download_history():
     return send_file(filepath, as_attachment=True)
 
 if __name__ == '__main__':
-    app.run(
-        host='0.0.0.0',
-        port=int(os.environ.get("PORT", 5000)),
-        debug=False
-    )
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=False)
