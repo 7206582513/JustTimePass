@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>SmartDoc Scholar</title>
+  <title>SmartDoc Scholar – Focus Mode</title>
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
   <link href="https://fonts.cdnfonts.com/css/opendyslexic" rel="stylesheet">
   <style>
@@ -13,20 +13,46 @@
       letter-spacing: 0.05em;
       line-height: 1.6;
     }
+    .timer-box {
+      font-size: 1.5em;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    pre {
+      background-color: #f8f9fa;
+      padding: 10px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+    }
   </style>
   <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
 </head>
 <body>
 <div class="container mt-4">
   <h2 class="mb-3">📘 SmartDoc Scholar</h2>
 
-  <button class="btn btn-sm btn-warning mb-3" id="toggle-dyslexia">🧠 Toggle Dyslexia Mode</button>
+  <div class="mb-3">
+    <button class="btn btn-warning btn-sm" id="toggle-dyslexia">🧠 Dyslexia Font</button>
+    <button class="btn btn-info btn-sm" onclick="toggleChecklist()">📋 Show Checklist</button>
+  </div>
 
+  <!-- ✅ Checklist-style Learning -->
+  <div id="checklist" class="mb-4" style="display:none;">
+    <h5>✅ Learning Checklist</h5>
+    <ul class="list-group">
+      <li class="list-group-item"><input type="checkbox"> Read Summary</li>
+      <li class="list-group-item"><input type="checkbox"> Listen to Audio</li>
+      <li class="list-group-item"><input type="checkbox"> Take Quiz</li>
+      <li class="list-group-item"><input type="checkbox"> Try Flashcards</li>
+      <li class="list-group-item"><input type="checkbox"> Revise Yesterday</li>
+    </ul>
+  </div>
+
+  <!-- PDF Upload -->
   <form method="POST" enctype="multipart/form-data">
     <div class="form-group">
       <label>Upload PDF Notes</label>
-      <input type="file" name="pdf" accept="application/pdf" class="form-control">
+      <input type="file" name="pdf" accept="application/pdf" class="form-control" required>
     </div>
     <button type="submit" class="btn btn-primary">Analyze PDF</button>
   </form>
@@ -83,29 +109,48 @@
     </ul>
   </div>
   {% endif %}
+
+  <hr>
+
+  <!-- 🧠 Text Simplifier -->
+  <h5>🔄 Text Simplifier</h5>
+  <textarea id="complex-text" class="form-control mb-2" rows="3" placeholder="Paste hard content to simplify..."></textarea>
+  <button onclick="simplifyText()" class="btn btn-info btn-sm">Simplify</button>
+  <div id="simplified-result" class="alert alert-light mt-2"></div>
+
+  <!-- 🃏 Flashcard Generator -->
+  <h5 class="mt-4">🃏 Flashcards</h5>
+  <textarea id="flashcard-input" class="form-control mb-2" rows="3" placeholder="Paste topic or content..."></textarea>
+  <button onclick="generateFlashcards()" class="btn btn-primary btn-sm">Generate Flashcards</button>
+  <div id="flashcard-result" class="mt-2"></div>
+
+  <!-- ⏳ Pomodoro Timer -->
+  <h5 class="mt-4">⏳ Pomodoro Focus Timer</h5>
+  <div class="timer-box" id="timer-display">25:00</div>
+  <button onclick="startPomodoro()" class="btn btn-success btn-sm">Start</button>
 </div>
 
 <script>
-  // Normalize strings for answer comparison
-  function normalize(str) {
-    if (!str) return '';
-    return $("<textarea>").html(String(str)).text().replace(/\s+/g, " ").trim().toLowerCase();
+  // Dyslexia Mode
+  $('#toggle-dyslexia').click(function () {
+    $('body').toggleClass('dyslexia-mode');
+  });
+
+  // Checklist Toggle
+  function toggleChecklist() {
+    $('#checklist').slideToggle();
   }
 
   // Quiz logic
   $('#quiz-section').on('click', '.option-btn', function () {
     const selected = $(this).data('choice');
     const correct = $(this).data('answer');
-
     const selectedNorm = normalize(selected);
     const correctNorm = normalize(correct);
-
     const isCorrect = selectedNorm === correctNorm;
     const allOptions = $(this).closest('.mb-4').find('.option-btn');
     const feedback = $(this).closest('.mb-4').find('.feedback');
-
     allOptions.prop('disabled', true);
-
     allOptions.each(function () {
       const choice = normalize($(this).data('choice'));
       if (choice === correctNorm) {
@@ -114,35 +159,68 @@
         $(this).removeClass('btn-outline-primary').addClass('btn-danger');
       }
     });
-
-    if (isCorrect) {
-      feedback.text("✅ Correct! Great job.").css("color", "green");
-    } else {
-      feedback.text("❌ Incorrect. The correct answer is highlighted in green.").css("color", "red");
-    }
+    feedback.text(isCorrect ? "✅ Correct!" : "❌ Incorrect. Correct is highlighted in green.")
+      .css("color", isCorrect ? "green" : "red");
   });
 
-  // Chat form AJAX
+  function normalize(str) {
+    if (!str) return '';
+    return $("<textarea>").html(String(str)).text().replace(/\s+/g, " ").trim().toLowerCase();
+  }
+
+  // Chat
   $('#chat-form').submit(function (e) {
     e.preventDefault();
     const query = $('#query').val();
+    $('#chat-result').html("Thinking...");
     $.post('/chat', { query: query }, function (data) {
       $('#chat-result').html(`<strong>Response:</strong> ${data.response}`);
     });
   });
 
-  // Dyslexia Mode Toggle
-  $('#toggle-dyslexia').click(function () {
-    $('body').toggleClass('dyslexia-mode');
-  });
-
-  // Read-aloud for any element by ID
+  // Text-to-Speech
   function speakText(id) {
     const content = document.getElementById(id).innerText;
     const synth = window.speechSynthesis;
     const utter = new SpeechSynthesisUtterance(content);
     utter.rate = 0.9;
     synth.speak(utter);
+  }
+
+  // Simplifier
+  function simplifyText() {
+    const text = $('#complex-text').val();
+    $('#simplified-result').html("Simplifying...");
+    $.post('/simplify', { text: text }, function (data) {
+      $('#simplified-result').html(data.simplified);
+    });
+  }
+
+  // Flashcard Generator
+  function generateFlashcards() {
+    const text = $('#flashcard-input').val();
+    $('#flashcard-result').html("Generating...");
+    $.post('/flashcards', { text: text }, function (data) {
+      $('#flashcard-result').html(`<pre>${data.cards}</pre>`);
+    });
+  }
+
+  // Pomodoro Timer
+  let timer, seconds = 1500;
+  function startPomodoro() {
+    clearInterval(timer);
+    seconds = 1500;
+    timer = setInterval(() => {
+      if (seconds <= 0) {
+        clearInterval(timer);
+        alert("⏰ Break Time!");
+      } else {
+        seconds--;
+        const min = String(Math.floor(seconds / 60)).padStart(2, '0');
+        const sec = String(seconds % 60).padStart(2, '0');
+        $('#timer-display').text(`${min}:${sec}`);
+      }
+    }, 1000);
   }
 </script>
 </body>
